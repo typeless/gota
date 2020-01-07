@@ -7,63 +7,72 @@ import (
 	"strings"
 )
 
+// boolElements is the concrete implementation of Elements for Bool elements.
+type boolElements struct {
+	data []bool
+	nan  []bool
+}
+
+func (es boolElements) Len() int           { return len(es.data) }
+func (es boolElements) Elem(i int) Element { return &boolElement{&es.data[i], &es.nan[i]} }
+
 type boolElement struct {
-	e   bool
-	nan bool
+	e   *bool
+	nan *bool
 }
 
 func (e *boolElement) Set(value interface{}) {
-	e.nan = false
+	*e.nan = false
 	switch value.(type) {
 	case string:
 		if value.(string) == "NaN" {
-			e.nan = true
+			*e.nan = true
 			return
 		}
 		switch strings.ToLower(value.(string)) {
 		case "true", "t", "1":
-			e.e = true
+			*e.e = true
 		case "false", "f", "0":
-			e.e = false
+			*e.e = false
 		default:
-			e.nan = true
+			*e.nan = true
 			return
 		}
 	case int:
 		switch value.(int) {
 		case 1:
-			e.e = true
+			*e.e = true
 		case 0:
-			e.e = false
+			*e.e = false
 		default:
-			e.nan = true
+			*e.nan = true
 			return
 		}
 	case float64:
 		switch value.(float64) {
 		case 1:
-			e.e = true
+			*e.e = true
 		case 0:
-			e.e = false
+			*e.e = false
 		default:
-			e.nan = true
+			*e.nan = true
 			return
 		}
 	case bool:
-		e.e = value.(bool)
+		*e.e = value.(bool)
 	case Element:
 		if value.(Element).Value().Type().Kind() == reflect.Bool {
-			e.e = value.(Element).Value().Bool()
+			*e.e = value.(Element).Value().Bool()
 		} else {
 			v := value.(Element).ConvertTo(Bool)
 			if v.Type() != Bool {
-				e.nan = true
+				*e.nan = true
 			} else {
-				e.e = v.Bool()
+				*e.e = v.Bool()
 			}
 		}
 	default:
-		e.nan = true
+		*e.nan = true
 		return
 	}
 	return
@@ -73,7 +82,7 @@ func (e boolElement) Copy() Element {
 	if e.IsNA() {
 		return &boolElement{false, true}
 	}
-	return &boolElement{e.e, false}
+	return &boolElement{e: &[]int{*e.e}[0], nan: &[]bool{*e.nan}[0]}
 }
 
 func (e boolElement) IsNA() bool {

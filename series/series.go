@@ -48,24 +48,6 @@ type Element interface {
 	Type() reflect.Type
 }
 
-// stringElements is the concrete implementation of Elements for String elements.
-type stringElements []stringElement
-
-func (e stringElements) Len() int           { return len(e) }
-func (e stringElements) Elem(i int) Element { return &e[i] }
-
-// floatElements is the concrete implementation of Elements for Float elements.
-type floatElements []floatElement
-
-func (e floatElements) Len() int           { return len(e) }
-func (e floatElements) Elem(i int) Element { return &e[i] }
-
-// boolElements is the concrete implementation of Elements for Bool elements.
-type boolElements []boolElement
-
-func (e boolElements) Len() int           { return len(e) }
-func (e boolElements) Elem(i int) Element { return &e[i] }
-
 // ElementValue represents the value that can be used for marshaling or
 // unmarshaling Elements.
 type ElementValue interface{}
@@ -120,13 +102,13 @@ func New(values interface{}, t Type, name string) Series {
 	preAlloc := func(n int) {
 		switch t {
 		case String:
-			ret.elements = make(stringElements, n)
+			ret.elements = stringElements{data: make([]string, n), nan: make([]bool, n)}
 		case Int:
-			ret.elements = make(intElements, n)
+			ret.elements = intElements{data: make([]int, n), nan: make([]bool, n)}
 		case Float:
-			ret.elements = make(floatElements, n)
+			ret.elements = floatElements{data: make([]float64, n), nan: make([]bool, n)}
 		case Bool:
-			ret.elements = make(boolElements, n)
+			ret.elements = boolElements{data: make([]bool, n), nan: make([]bool, n)}
 		default:
 			panic(fmt.Sprintf("unknown type %v", t))
 		}
@@ -229,13 +211,21 @@ func (s *Series) Append(values interface{}) {
 	news := New(values, s.t, s.Name)
 	switch s.t {
 	case String:
-		s.elements = append(s.elements.(stringElements), news.elements.(stringElements)...)
+		es := s.elements.(stringElements)
+		es.data = append(es.data, news.elements.(stringElements).data...)
+		es.nan = append(es.nan, news.elements.(stringElements).nan...)
 	case Int:
-		s.elements = append(s.elements.(intElements), news.elements.(intElements)...)
+		es := s.elements.(intElements)
+		es.data = append(es.data, news.elements.(intElements).data...)
+		es.nan = append(es.nan, news.elements.(intElements).nan...)
 	case Float:
-		s.elements = append(s.elements.(floatElements), news.elements.(floatElements)...)
+		es := s.elements.(floatElements)
+		es.data = append(es.data, news.elements.(floatElements).data...)
+		es.nan = append(es.nan, news.elements.(floatElements).nan...)
 	case Bool:
-		s.elements = append(s.elements.(boolElements), news.elements.(boolElements)...)
+		es := s.elements.(boolElements)
+		es.data = append(es.data, news.elements.(boolElements).data...)
+		es.nan = append(es.nan, news.elements.(boolElements).nan...)
 	}
 }
 
@@ -270,27 +260,27 @@ func (s Series) Subset(indexes Indexes) Series {
 	}
 	switch s.t {
 	case String:
-		elements := make(stringElements, len(idx))
+		elements := stringElements{data: make([]string, len(idx)), nan: make([]bool, len(idx))}
 		for k, i := range idx {
-			elements[k] = s.elements.(stringElements)[i]
+			elements.data[k] = s.elements.(stringElements).data[i]
 		}
 		ret.elements = elements
 	case Int:
-		elements := make(intElements, len(idx))
+		elements := intElements{data: make([]int, len(idx)), nan: make([]bool, len(idx))}
 		for k, i := range idx {
-			elements[k] = s.elements.(intElements)[i]
+			elements.data[k] = s.elements.(intElements).data[i]
 		}
 		ret.elements = elements
 	case Float:
-		elements := make(floatElements, len(idx))
+		elements := floatElements{data: make([]float64, len(idx)), nan: make([]bool, len(idx))}
 		for k, i := range idx {
-			elements[k] = s.elements.(floatElements)[i]
+			elements.data[k] = s.elements.(floatElements).data[i]
 		}
 		ret.elements = elements
 	case Bool:
-		elements := make(boolElements, len(idx))
+		elements := boolElements{data: make([]bool, len(idx)), nan: make([]bool, len(idx))}
 		for k, i := range idx {
-			elements[k] = s.elements.(boolElements)[i]
+			elements.data[k] = s.elements.(boolElements).data[i]
 		}
 		ret.elements = elements
 	default:
@@ -413,17 +403,23 @@ func (s Series) Copy() Series {
 	var elements Elements
 	switch s.t {
 	case String:
-		elements = make(stringElements, s.Len())
-		copy(elements.(stringElements), s.elements.(stringElements))
+		es:= stringElements{data: make([]string, s.Len()), nan: make([]bool, s.Len())}
+		copy(es.data, s.elements.(stringElements).data)
+		copy(es.nan, s.elements.(stringElements).nan)
+		elements = es
 	case Float:
-		elements = make(floatElements, s.Len())
-		copy(elements.(floatElements), s.elements.(floatElements))
+		es := floatElements{data: make([]float64, s.Len()), nan: make([]bool, s.Len())}
+		copy(es.nan, s.elements.(floatElements).nan)
+		elements = es
 	case Bool:
-		elements = make(boolElements, s.Len())
-		copy(elements.(boolElements), s.elements.(boolElements))
+		es:= boolElements{data: make([]bool, s.Len()), nan: make([]bool, s.Len())}
+		copy(es.nan, s.elements.(boolElements).nan)
+		elements = es
 	case Int:
-		elements = make(intElements, s.Len())
-		copy(elements.(intElements), s.elements.(intElements))
+		es:= intElements{data: make([]int, s.Len()), nan: make([]bool, s.Len())}
+		copy(es.data, s.elements.(intElements).data)
+		copy(es.nan, s.elements.(intElements).nan)
+		elements = es
 	}
 	ret := Series{
 		Name:     name,
@@ -726,8 +722,7 @@ func (s Series) Quantile(p float64) float64 {
 // instead expects to handle Element(s) of type Float.
 func (s Series) Map(f MapFunction) Series {
 
-	mappedValues := reflect.MakeSlice(reflect.TypeOf(f).Out(0), s.Len())
-	//mappedValues := make([]Element, s.Len())
+	mappedValues := reflect.MakeSlice(reflect.TypeOf(f).Out(0), s.Len(), s.Len())
 	for i := 0; i < s.Len(); i++ {
 		value := f(s.elements.Elem(i))
 		mappedValues.Index(i).Set(reflect.ValueOf(value))

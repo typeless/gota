@@ -7,6 +7,15 @@ import (
 	"strconv"
 )
 
+// stringElements is the concrete implementation of Elements for String elements.
+type stringElements struct {
+	data []string
+	nan  []bool
+}
+
+func (e stringElements) Len() int           { return len(e) }
+func (e stringElements) Elem(i int) Element { return &e[i] }
+
 type stringElement struct {
 	e   string
 	nan bool

@@ -7,6 +7,15 @@ import (
 	"strconv"
 )
 
+// floatElements is the concrete implementation of Elements for Float elements.
+type floatElements struct {
+	data []float64
+	nan  []bool
+}
+
+func (e floatElements) Len() int           { return len(e) }
+func (e floatElements) Elem(i int) Element { return &e[i] }
+
 type floatElement struct {
 	e   float64
 	nan bool

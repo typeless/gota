@@ -9,58 +9,59 @@ import (
 
 // intElements is the concrete implementation of Elements for Int elements.
 type intElements struct {
-	data []intElement
+	data []int
 	nan  []bool
 }
 
 func (es intElements) Len() int           { return len(es.data) }
-func (es intElements) Elem(i int) Element { return &es.data[i] }
+func (es intElements) Elem(i int) Element { return &intElement{&es.data[i], &es.nan[i]} }
 
 type intElement struct {
-	e int
+	e   *int
+	nan *bool
 }
 
-func (es *intElement) Set(i int, value interface{}) {
-	es.nan[i] = false
+func (e *intElement) Set(value interface{}) {
+	*e.nan = false
 	switch value.(type) {
 	case string:
 		if value.(string) == "NaN" {
-			es[i].nan = true
+			*e.nan = true
 			return
 		}
-		v, err := strconv.Atoi(value.(string))
+		i, err := strconv.Atoi(value.(string))
 		if err != nil {
-			es.data[i].nan = true
+			*e.nan = true
 			return
 		}
-		es.data[i] = v
+		*e.e = i
 	case int:
-		es.data[i] = int(value.(int))
+		*e.e = int(value.(int))
 	case float64:
 		f := value.(float64)
 		if math.IsNaN(f) ||
 			math.IsInf(f, 0) ||
 			math.IsInf(f, 1) {
-			es.nan[i] = true
+			*e.nan = true
 			return
 		}
-		es.data[i] = int(f)
+		*e.e = int(f)
 	case bool:
 		b := value.(bool)
 		if b {
-			es.data[i] = 1
+			*e.e = 1
 		} else {
-			es.data[i] = 0
+			*e.e = 0
 		}
 	case Element:
 		v := value.(Element).ConvertTo(Int)
 		if v.Type() != Int {
-			es.nan[i] = true
+			*e.nan = true
 		} else {
-			es.data[i] = int(v.Int())
+			*e.e = int(v.Int())
 		}
 	default:
-		es.nan[i] = true
+		*e.nan = true
 		return
 	}
 	return
