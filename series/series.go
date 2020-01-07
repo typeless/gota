@@ -48,12 +48,6 @@ type Element interface {
 	Type() reflect.Type
 }
 
-// intElements is the concrete implementation of Elements for Int elements.
-type intElements []intElement
-
-func (e intElements) Len() int           { return len(e) }
-func (e intElements) Elem(i int) Element { return &e[i] }
-
 // stringElements is the concrete implementation of Elements for String elements.
 type stringElements []stringElement
 
@@ -732,10 +726,11 @@ func (s Series) Quantile(p float64) float64 {
 // instead expects to handle Element(s) of type Float.
 func (s Series) Map(f MapFunction) Series {
 
-	mappedValues := make([]Element, s.Len())
+	mappedValues := reflect.MakeSlice(reflect.TypeOf(f).Out(0), s.Len())
+	//mappedValues := make([]Element, s.Len())
 	for i := 0; i < s.Len(); i++ {
 		value := f(s.elements.Elem(i))
-		mappedValues[i] = value
+		mappedValues.Index(i).Set(reflect.ValueOf(value))
 	}
-	return New(mappedValues, s.Type(), s.Name)
+	return New(mappedValues.Interface(), s.Type(), s.Name)
 }

@@ -7,52 +7,60 @@ import (
 	"strconv"
 )
 
-type intElement struct {
-	e   int
-	nan bool
+// intElements is the concrete implementation of Elements for Int elements.
+type intElements struct {
+	data []intElement
+	nan  []bool
 }
 
-func (e *intElement) Set(value interface{}) {
-	e.nan = false
+func (es intElements) Len() int           { return len(es.data) }
+func (es intElements) Elem(i int) Element { return &es.data[i] }
+
+type intElement struct {
+	e int
+}
+
+func (es *intElement) Set(i int, value interface{}) {
+	es.nan[i] = false
 	switch value.(type) {
 	case string:
 		if value.(string) == "NaN" {
-			e.nan = true
+			es[i].nan = true
 			return
 		}
-		i, err := strconv.Atoi(value.(string))
+		v, err := strconv.Atoi(value.(string))
 		if err != nil {
-			e.nan = true
+			es.data[i].nan = true
 			return
 		}
-		e.e = i
+		es.data[i] = v
 	case int:
-		e.e = int(value.(int))
+		es.data[i] = int(value.(int))
 	case float64:
 		f := value.(float64)
 		if math.IsNaN(f) ||
 			math.IsInf(f, 0) ||
 			math.IsInf(f, 1) {
-			e.nan = true
+			es.nan[i] = true
 			return
 		}
-		e.e = int(f)
+		es.data[i] = int(f)
 	case bool:
 		b := value.(bool)
 		if b {
-			e.e = 1
+			es.data[i] = 1
 		} else {
-			e.e = 0
+			es.data[i] = 0
 		}
 	case Element:
 		v := value.(Element).ConvertTo(Int)
 		if v.Type() != Int {
-			e.nan = true
+			es.nan[i] = true
 		} else {
-			e.e = int(v.Int())
+			es.data[i] = int(v.Int())
 		}
 	default:
-		e.nan = true
+		es.nan[i] = true
 		return
 	}
 	return
